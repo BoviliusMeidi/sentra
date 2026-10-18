@@ -218,3 +218,12 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Data and Logs
+data
+logs/**
+
+# dvc
+.dvc/cache/
+.dvc/tmp/
+.dvc/gdrive-credentials.json
