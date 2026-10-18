@@ -1,0 +1,169 @@
+<header class="navbar">
+    <div class="nav-brand">
+        <div id="logo"></div>
+        <div class="nav-brand-text">SENTRA</div>
+    </div>
+    <nav class="nav-links" aria-label="Main Navigation">
+        <a href="Train_Model" target="_self" class="nav-link">⚙️ Train Model</a>
+        <a href="Evaluate_Model" target="_self" class="nav-link">📊 Evaluate Model</a>
+        <a href="Image_Reconstruction" target="_self" class="nav-link">🗺️ Reconstruction</a>
+        <a href="Help" target="_self" class="nav-link">❓ Help</a>
+    </nav>
+</header>
+
+<main class="scroll-wrapper">
+    <section class="snap-section hero-section" id="section-1" aria-label="Hero Introduction">
+        <div class="content-limit hero-content">
+            <h1 class="hero-title">SENTRA</h1>
+            <h2 class="hero-acronym">
+                <b>S</b>entinel-2 <b>E</b>lastic-<b>N</b>et <b>T</b>emporal <b>R</b>econstruction <b>A</b>pplication
+            </h2>
+            <p class="hero-desc">
+                An web platform for intelligently reconstructing cloud-masked satellite imagery,
+                combining Elastic Net regression with geospatial integrity.
+            </p>
+        </div>
+    </section>
+
+    <section class="snap-section about-section" id="sec2" aria-labelledby="about-title">
+        <div class="content-limit about-content">
+            <h2 class="section-title" id="about-title">About SENTRA</h2>
+            <p class="section-desc">
+                Optical satellite imagery in tropical regions, such as the Ciliwung Watershed, is frequently obstructed by persistent cloud cover,
+                significantly hindering environmental and land cover analysis.
+                <br><br>
+                <b>SENTRA</b> addresses this challenge by employing a <em>Sliding Window</em> approach powered by <em>Elastic Net Regression</em>.
+                The system leverages multi-temporal historical contexts and multi-spectral band data to accurately impute
+                missing pixel values (Gap-Filling) with mathematical precision while preserving true spectral fidelity.
+            </p>
+        </div>
+    </section>
+
+    <section class="snap-section feature-section" id="sec3" aria-label="Core Features Showcase">
+        <input type="radio" name="feature-tab" id="feat-radio-1" checked class="hidden-radio">
+        <input type="radio" name="feature-tab" id="feat-radio-2" class="hidden-radio">
+        <input type="radio" name="feature-tab" id="feat-radio-3" class="hidden-radio">
+
+        <div class="content-limit feature-showcase-wwm">
+            <h2 class="section-title">Core Features</h2>
+            <article class="feature-text-container">
+                <div class="feature-pane" id="pane-1" aria-labelledby="feat-title-1">
+                    <span class="feat-tag">01 / TRAINING</span>
+                    <h3 id="feat-title-1">Train Model</h3>
+                    <p>Perform image reconstruction model training by optimizing the Elastic Net regression algorithm using historical multi-temporal spatial data.</p>
+                </div>
+                <div class="feature-pane" id="pane-2" aria-labelledby="feat-title-2">
+                    <span class="feat-tag">02 / EVALUATION</span>
+                    <h3 id="feat-title-2">Evaluate Model</h3>
+                    <p>Validate trained model performance, delivering comprehensive evaluation reports containing regression statistical accuracy metrics and spatial structural similarity indices.</p>
+                </div>
+                <div class="feature-pane" id="pane-3" aria-labelledby="feat-title-3">
+                    <span class="feat-tag">03 / RECONSTRUCTION</span>
+                    <h3 id="feat-title-3">Image Reconstruction</h3>
+                    <p>Predict and reconstruct cloud-masked imagery pixels with side-by-side visual comparisons, complete with standard geospatial format export capabilities for final outputs.</p>
+                </div>
+            </article>
+
+            <nav class="feature-nav-tabs-wwm" aria-label="Feature Navigation">
+                <label for="feat-radio-1" class="feat-tab-wwm" id="lbl-feat-1">Train Model</label>
+                <label for="feat-radio-2" class="feat-tab-wwm" id="lbl-feat-2">Evaluate Model</label>
+                <label for="feat-radio-3" class="feat-tab-wwm" id="lbl-feat-3">Image Reconstruction</label>
+            </nav>
+        </div>
+    </section>
+
+    <section class="snap-section team-section" id="sec4" aria-label="Development Team Profile">
+        <input type="radio" name="team-tab" id="team-radio-1" checked class="hidden-radio">
+        <input type="radio" name="team-tab" id="team-radio-2" class="hidden-radio">
+        <input type="radio" name="team-tab" id="team-radio-3" class="hidden-radio">
+
+        <div class="content-limit team-showcase-wwm">
+            <h2 class="section-title behind-screen-title">Behind the Screen</h2>
+            <div class="team-split-wwm">
+                <nav class="team-names-list" aria-label="Team Member Selection">
+                    <label for="team-radio-1" class="team-name-item" id="t-lbl-1">
+                        <span class="t-idx">01</span>
+                        <span class="t-nametext">Bovilius Meidi</span>
+                    </label>
+                    <label for="team-radio-2" class="team-name-item" id="t-lbl-2">
+                        <span class="t-idx">02</span>
+                        <span class="t-nametext">Dyah Erny Herwindiati</span>
+                    </label>
+                    <label for="team-radio-3" class="team-name-item" id="t-lbl-3">
+                        <span class="t-idx">03</span>
+                        <span class="t-nametext">Janson Hendryli</span>
+                    </label>
+                </nav>
+
+                <article class="team-focus-panel">
+                    <div class="team-focus-pane" id="t-pane-1">
+                        <figure class="team-photo-frame">
+                            <img id="img-bovilius" alt="Portrait of Bovilius Meidi">
+                            <figcaption class="tf-role">Developer & Researcher</figcaption>
+                        </figure>
+                    </div>
+                    <div class="team-focus-pane" id="t-pane-2">
+                        <figure class="team-photo-frame">
+                            <img id="img-dyah" alt="Portrait of Dyah Erny Herwindiati">
+                            <figcaption class="tf-role">Professor</figcaption>
+                        </figure>
+                    </div>
+                    <div class="team-focus-pane" id="t-pane-3">
+                        <figure class="team-photo-frame">
+                            <img id="img-janson" alt="Portrait of Janson Hendryli">
+                            <figcaption class="tf-role">Assistant Professor</figcaption>
+                        </figure>
+                    </div>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <section class="snap-section contact-section" id="sec5" aria-labelledby="contact-title">
+        <div class="content-limit contact-container">
+            <header class="contact-header">
+                <h2 class="section-title" id="contact-title">Get In Touch</h2>
+            </header>
+
+            <address class="contact-list">
+                <a href="mailto:boviliusbm@gmail.com" class="contact-list-item">
+                    <span class="c-idx">01</span>
+                    <div class="c-info">
+                        <span class="c-label">EMAIL</span>
+                        <span class="c-value">boviliusbm@gmail.com</span>
+                    </div>
+                </a>
+                <a href="https://github.com/BoviliusMeidi" target="_blank" rel="noopener noreferrer" class="contact-list-item">
+                    <span class="c-idx">02</span>
+                    <div class="c-info">
+                        <span class="c-label">GITHUB</span>
+                        <span class="c-value">github.com/BoviliusMeidi</span>
+                    </div>
+                </a>
+                <div class="contact-list-item no-hover">
+                    <span class="c-idx">03</span>
+                    <div class="c-info">
+                        <span class="c-label">INSTITUTION</span>
+                        <span class="c-value">Faculty of Information Technology, Tarumanagara University</span>
+                    </div>
+                </div>
+            </address>
+        </div>
+    </section>
+
+    <footer class="snap-footer" id="sec6">
+        <div class="footer-content-wrapper">
+            <div class="footer-top">
+                <figure class="footer-logo-container">
+                    <img id="footer-logo" alt="SENTRA Brand Logo">
+                </figure>
+                <div class="footer-brand">SENTRA</div>
+                <p class="footer-subtitle">Sentinel-2 Elastic-Net Temporal Reconstruction Application</p>
+            </div>
+            <hr class="footer-divider">
+            <div class="footer-bottom">
+                <small class="footer-copy">&copy; 2026 Bovilius Meidi. All rights reserved.</small>
+            </div>
+        </div>
+    </footer>
+</main>
