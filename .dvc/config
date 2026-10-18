@@ -1,0 +1,4 @@
+[core]
+    remote = sentradvc
+['remote "sentradvc"']
+    url = gdrive://1geAUFJ6wIG4v7ojbHrUNGcFZnr0-uLq0
