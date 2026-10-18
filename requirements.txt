@@ -1,0 +1,17 @@
+streamlit
+streamlit-folium
+scikit-learn
+rasterio
+numpy
+pandas
+folium
+geopandas
+fiona
+plotly
+scikit-image
+matplotlib
+rioxarray
+openpyxl
+xlsxwriter
+commitizen
+dvc[gdrive]
