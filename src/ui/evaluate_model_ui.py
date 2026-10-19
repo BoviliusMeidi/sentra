@@ -68,8 +68,9 @@ def render_target_parameters_card(kecamatan_list, spectral_bands):
 
         district_col, band_col = st.columns(2)
         with district_col:
+            district_options = kecamatan_list + ["Custom Upload"]
             selected_district = st.selectbox(
-                "Select Target District", kecamatan_list, key="eval_dist"
+                "Select Target District", district_options, key="eval_dist"
             )
         with band_col:
             band_options = ["All Bands"] + spectral_bands
@@ -81,7 +82,6 @@ def render_target_parameters_card(kecamatan_list, spectral_bands):
         selected_model = None
 
         if selected_band == "All Bands":
-            st.markdown("###### Select Base Model for Evaluation")
             district_dir = config.SAVED_MODELS_DIR / selected_district
             if district_dir.exists():
                 band_base_sets = []
@@ -133,30 +133,27 @@ def render_target_parameters_card(kecamatan_list, spectral_bands):
 
     return selected_district, selected_band, selected_model
 
-def render_evaluation_data_source():
+def render_custom_evaluation_uploaders():
     with st.container(border=True):
-        st.markdown("##### Evaluation Data Source")
-        data_source = st.radio(
-            "Select the spatial data extraction paradigm:",
-            ["Data Segmen 1 Segmen 2 DAS Ciliwung", "Upload Data"],
-            key="eval_data_source",
-        )
+        st.info("The evaluation engine will automatically detect the Temporal Window Size (W) used during training and seamlessly pull the historical datasets from your Permanent Custom Workspace.")
 
-        if data_source == "Data Segmen 1 Segmen 2 DAS Ciliwung":
-            return "internal", None
-        else:
-            w_size = st.slider(
-                "Temporal Window Size (W) for reconstruction",
-                min_value=3,
-                max_value=7,
-                value=5,
-                step=2,
-                key="eval_custom_w",
-            )
-            from src.ui.train_model_ui import render_dynamic_uploaders
+        st.markdown("#### Upload Evaluation Target (Ground Truth)")
+        st.file_uploader("Target - SCL (Cloud Mask) (.tif)", key="eval_gt_scl")
 
-            render_dynamic_uploaders(window_size=int(w_size), is_disabled=False)
-            return "custom", int(w_size)
+        cols = st.columns(3)
+        for j, band in enumerate(ALL_BANDS):
+            cols[j % 3].file_uploader(f"Target - {band} (.tif)", type=["tif"], key=f"eval_gt_{band}")
+
+        st.markdown("#### Spatial Constraint (Optional)")
+        st.info("Upload your Shapefile bundle if you want to explicitly clip the evaluation boundaries. If omitted, the evaluator will use the shapefile from your last training session.")
+
+        shp_col1, shp_col2 = st.columns(2)
+        with shp_col1:
+            st.file_uploader("Upload (.shp)", type=["shp"], key="eval_shp")
+            st.file_uploader("Upload (.shx)", type=["shx"], key="eval_shx")
+        with shp_col2:
+            st.file_uploader("Upload (.dbf)", type=["dbf"], key="eval_dbf")
+            st.file_uploader("Upload (.prj)", type=["prj"], key="eval_prj")
 
 def render_evaluation_metrics(metrics):
     with st.container(border=True):

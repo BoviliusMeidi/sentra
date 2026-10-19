@@ -71,8 +71,9 @@ def render_reconstruction_parameters_card(kecamatan_list, spectral_bands):
 
         district_col, band_col = st.columns(2)
         with district_col:
+            district_options = kecamatan_list + ["Custom Upload"]
             selected_district = st.selectbox(
-                "Select Target District", kecamatan_list, key="recon_dist"
+                "Select Target District", district_options, key="recon_dist"
             )
         with band_col:
             band_options = ["All Bands"] + spectral_bands
@@ -84,7 +85,6 @@ def render_reconstruction_parameters_card(kecamatan_list, spectral_bands):
         selected_model = None
 
         if selected_band == "All Bands":
-            st.markdown("###### Select Base Model")
             district_dir = config.SAVED_MODELS_DIR / selected_district
             if district_dir.exists():
                 band_base_sets = []
@@ -131,18 +131,17 @@ def render_reconstruction_parameters_card(kecamatan_list, spectral_bands):
 
 def render_custom_reconstruction_uploaders(prefix: str = "recon"):
     st.markdown("#### Upload Target Imagery for Reconstruction")
-    st.info(
-        "Please upload the cloudy raster imagery for the single target date you wish to reconstruct."
-    )
+    st.info("You only need to upload the single target date (the cloudy raster imagery) that you wish to gap-fill.")
 
-    st.file_uploader("Target - SCL (Cloud Mask)", key=f"{prefix}_target_scl")
+    st.file_uploader("Cloudy Target - SCL (Cloud Mask) (.tif)", key=f"{prefix}_target_scl")
+
     cols = st.columns(3)
     for j, band in enumerate(ALL_BANDS):
-        cols[j % 3].file_uploader(f"Target - {band}", key=f"{prefix}_target_{band}")
+        cols[j % 3].file_uploader(f"Cloudy Target - {band} (.tif)", type=["tif"], key=f"{prefix}_target_{band}")
 
-    st.markdown("#### Spatial Constraint")
+    st.markdown("#### Spatial Constraint (Optional)")
     st.info(
-        "Please upload all necessary shapefile components simultaneously (`.shp`, `.shx`, `.dbf`, and `.prj`) to ensure correct spatial coordinate reference system (CRS) binding."
+        "You may optionally upload a Shapefile bundle if you wish to apply a new clipping boundary. If left empty, the system will automatically inherit the spatial constraint used during your model's training phase."
     )
 
     shp_col1, shp_col2 = st.columns(2)
@@ -227,16 +226,13 @@ def display_map_in_streamlit(
 
 def render_reconstruction_results(visual_results, title_metadata, is_rgb=False):
     with st.container(border=True):
-        st.markdown(f"##### 🗺️ Spatial Reconstruction Results: {title_metadata}")
-        if is_rgb:
-            st.info("💡 Displaying spatial representation in **True Color RGB (B04, B03, B02)** with enhanced contrast stretch.")
+        st.markdown(f"##### 🗺️ Image Reconstruction Results: {title_metadata}")
 
         safe_key_prefix = "".join(c if c.isalnum() else "_" for c in title_metadata)
 
         is_synthetic = visual_results.get("is_synthetic", False)
 
         if is_synthetic:
-            st.info("ℹ️ **Synthetic Generation Mode**: This spatial image is completely synthesized from historical temporal patterns (100% Elastic Net prediction) without a cloudy target baseline.")
             st.markdown("**Fully Reconstructed Output (Gap-Free Synthesis)**")
             map_obj = render_folium_map(
                 visual_results["rgba_reconstructed"],
@@ -247,7 +243,7 @@ def render_reconstruction_results(visual_results, title_metadata, is_rgb=False):
         else:
             original_col, reconstructed_col = st.columns(2)
             with original_col:
-                st.markdown("**Original Target (Cloud-Obscured)**")
+                st.markdown("**Original Target**")
                 map_obj1 = render_folium_map(
                     visual_results["rgba_original"],
                     visual_results["spatial_bounds"],
@@ -255,7 +251,7 @@ def render_reconstruction_results(visual_results, title_metadata, is_rgb=False):
                 )
                 display_map_in_streamlit(map_obj1, map_key=f"{safe_key_prefix}_orig")
             with reconstructed_col:
-                st.markdown("**Gap-Filled Reconstruction (Overlay)**")
+                st.markdown("**Gap-Filled Reconstruction**")
                 map_obj2 = render_folium_map(
                     visual_results["rgba_reconstructed"],
                     visual_results["spatial_bounds"],

@@ -38,17 +38,17 @@ def render_dynamic_uploaders(window_size: int, is_disabled: bool = False):
 
     for i in range(1, window_size + 1):
         with st.expander(f"Historical Date {i}", expanded=(i==1)):
-            st.file_uploader(f"Date {i} - SCL (Cloud Mask)", disabled=is_disabled, key=f"up_hist_scl_{i}")
+            st.file_uploader(f"Date {i} - SCL (Cloud Mask) (tif)", type=["tif"], disabled=is_disabled, key=f"up_hist_scl_{i}")
             cols = st.columns(3)
             for j, band in enumerate(ALL_BANDS):
-                cols[j % 3].file_uploader(f"Date {i} - {band}", disabled=is_disabled, key=f"up_hist_{i}_{band}")
+                cols[j % 3].file_uploader(f"Date {i} - {band} (tif)", type=["tif"], disabled=is_disabled, key=f"up_hist_{i}_{band}")
 
     st.markdown("#### Upload Ground Truth Data")
     with st.expander("Ground Truth", expanded=True):
-        st.file_uploader("Target - SCL (Cloud Mask)", disabled=is_disabled, key="up_gt_scl")
+        st.file_uploader("Target - SCL (Cloud Mask) (tif)", type=["tif"], disabled=is_disabled, key="up_gt_scl")
         cols = st.columns(3)
         for j, band in enumerate(ALL_BANDS):
-            cols[j % 3].file_uploader(f"Target - {band}", disabled=is_disabled, key=f"up_gt_{band}")
+            cols[j % 3].file_uploader(f"Target - {band} (tif)", type=["tif"], disabled=is_disabled, key=f"up_gt_{band}")
 
     st.markdown("#### Upload Shapefile Data")
     st.info("Please upload all necessary shapefile components simultaneously (`.shp`, `.shx`, `.dbf`, and `.prj`) to ensure correct spatial coordinate reference system (CRS) binding.")
