@@ -9,6 +9,7 @@ from rasterio.warp import reproject
 from rasterio.enums import Resampling
 import rioxarray
 from rasterio.features import geometry_mask
+from pathlib import Path
 
 os.environ["SHAPE_RESTORE_SHX"] = "YES"
 
@@ -253,7 +254,7 @@ class EvaluateModelOrchestrator:
             "rgb_reconstructed": rgb_pred
         }
 
-    def execute_custom_single_band_evaluation(self, district: str, band: str, model_base_name: str, hist_payload: list, gt_path: str, gt_scl_path: str, shp_path: str):
+    def execute_custom_single_band_evaluation(self, district: str, band: str, model_base_name: str, gt_path: str, gt_scl_path: str, shp_path: str = None):
         band_model_dir = config.SAVED_MODELS_DIR / district / band
         target_filename = f"{model_base_name}_{band}.pkl"
         fallback_filename = f"{model_base_name}.pkl"
@@ -266,6 +267,18 @@ class EvaluateModelOrchestrator:
             return {"success": False, "error": f"Model {model_base_name} was not found in directory {band_model_dir}."}
 
         elastic_net_model = joblib.load(saved_model_path)
+
+        w = elastic_net_model.metadata.get("Window_Size", 5)
+
+        safe_base_name = "".join(c if c.isalnum() else "_" for c in model_base_name)
+        workspace_dir = Path("data/custom_workspace") / safe_base_name
+
+        if not workspace_dir.exists():
+            return {"success": False, "error": f"Historical cache for model '{model_base_name}' is missing. Please re-train the custom model."}
+
+        if not shp_path and (workspace_dir / "shapefile.shp").exists():
+            shp_path = str(workspace_dir / "shapefile.shp")
+
         clipper = VectorClipper(shp_path) if shp_path else None
 
         try:
@@ -283,24 +296,24 @@ class EvaluateModelOrchestrator:
 
         historical_features_list = []
         try:
-            for date_data in hist_payload:
-                scl_path = date_data.get("scl")
+            for i in range(1, w + 1):
+                scl_path = workspace_dir / f"hist_scl_{i}.tif"
                 scl_arr = None
-                if scl_path:
-                    scl_arr, _ = self._extract_and_preprocess(scl_path, is_scl=True, clipper=clipper, ref_meta=y_meta)
+                if scl_path.exists():
+                    scl_arr, _ = self._extract_and_preprocess(str(scl_path), is_scl=True, clipper=clipper, ref_meta=y_meta)
 
                 for b in ALL_BANDS:
-                    b_path = date_data["bands"].get(b)
-                    if not b_path:
-                        raise ValueError(f"Historical file for band {b} is missing in the temporal window.")
+                    b_path = workspace_dir / f"hist_{i}_{b}.tif"
+                    if not b_path.exists():
+                        raise ValueError(f"Historical file {b_path.name} is missing in the workspace cache.")
 
-                    x_arr_2d, _ = self._extract_and_preprocess(b_path, is_scl=False, clipper=clipper, ref_meta=y_meta)
+                    x_arr_2d, _ = self._extract_and_preprocess(str(b_path), is_scl=False, clipper=clipper, ref_meta=y_meta)
                     if scl_arr is not None:
                         x_arr_2d = self.cloud_masker.apply(x_arr_2d, scl_arr)
 
                     historical_features_list.append(x_arr_2d.flatten())
         except Exception as e:
-             return {"success": False, "error": f"Failed to extract historical feature matrix: {str(e)}"}
+             return {"success": False, "error": f"Failed to extract historical feature matrix from cache: {str(e)}"}
 
         historical_feature_matrix = np.column_stack(historical_features_list)
 
@@ -347,7 +360,7 @@ class EvaluateModelOrchestrator:
             "band": band
         }
 
-    def execute_custom_all_bands_evaluation(self, district: str, model_base_name: str, hist_payload: list, gt_paths: dict, gt_scl_path: str, shp_path: str):
+    def execute_custom_all_bands_evaluation(self, district: str, model_base_name: str, gt_paths: dict, gt_scl_path: str, shp_path: str = None):
         all_metrics = []
         gt_images_2d = {}
         pred_images_2d = {}
@@ -360,7 +373,7 @@ class EvaluateModelOrchestrator:
 
             res = self.execute_custom_single_band_evaluation(
                 district=district, band=band, model_base_name=model_base_name,
-                hist_payload=hist_payload, gt_path=gt_path, gt_scl_path=gt_scl_path, shp_path=shp_path
+                gt_path=gt_path, gt_scl_path=gt_scl_path, shp_path=shp_path
             )
 
             if res["success"]:

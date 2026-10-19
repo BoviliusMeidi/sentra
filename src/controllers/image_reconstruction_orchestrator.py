@@ -10,6 +10,8 @@ import joblib
 from io import BytesIO
 import geopandas as gpd
 from rasterio.features import geometry_mask
+from pathlib import Path
+import logging
 
 os.environ["SHAPE_RESTORE_SHX"] = "YES"
 
@@ -164,7 +166,6 @@ class ImageReconstructionOrchestrator:
             pred_arr[prediction_mask] = np.clip(preds, 0.0, 10000.0)
 
         pred_2d = pred_arr.reshape(img_h, img_w)
-
         patched_2d = np.where(np.isnan(orig_2d), pred_2d, orig_2d)
         patched_2d[~shapefile_geometry_mask] = np.nan
 
@@ -193,8 +194,8 @@ class ImageReconstructionOrchestrator:
             "is_synthetic": True if mode == "scratch" else False
         }
 
-    def execute_custom_reconstruction(self, district: str, band: str, model_base_name: str, hist_payload: list, shp_path: str, target_path: str = None, target_scl_path: str = None):
-        """Executes custom user uploads. Updated to allow target image processing."""
+    def execute_custom_reconstruction(self, district: str, band: str, model_base_name: str, shp_path: str = None, target_path: str = None, target_scl_path: str = None):
+        """Executes custom user uploads. Automatically pulls historical W data from permanent workspace."""
         band_model_dir = config.SAVED_MODELS_DIR / district / band
         target_filename = f"{model_base_name}_{band}.pkl"
         fallback_filename = f"{model_base_name}.pkl"
@@ -206,27 +207,39 @@ class ImageReconstructionOrchestrator:
             return {"success": False, "error": f"Model {model_base_name} was not found for band {band}."}
 
         elastic_net_model = joblib.load(saved_model_path)
+        w = elastic_net_model.metadata.get("Window_Size", 5)
+
+        safe_base_name = "".join(c if c.isalnum() else "_" for c in model_base_name)
+        workspace_dir = Path("data/custom_workspace") / safe_base_name
+
+        if not workspace_dir.exists():
+            return {"success": False, "error": f"Historical cache for model '{model_base_name}' is missing."}
+
+        if not shp_path and (workspace_dir / "shapefile.shp").exists():
+            shp_path = str(workspace_dir / "shapefile.shp")
+
         clipper = VectorClipper(shp_path) if shp_path else None
 
         historical_features = []
         ref_meta = None
         try:
-            for d_data in hist_payload:
-                scl_p = d_data.get("scl")
-                scl_a = None
-                if scl_p:
-                    scl_a, ref_meta = self._extract_and_preprocess(scl_p, is_scl=True, clipper=clipper, ref_meta=ref_meta)
+            for i in range(1, w + 1):
+                scl_path = workspace_dir / f"hist_scl_{i}.tif"
+                scl_arr = None
+                if scl_path.exists():
+                    scl_arr, ref_meta = self._extract_and_preprocess(str(scl_path), is_scl=True, clipper=clipper, ref_meta=ref_meta)
 
                 for b in ALL_BANDS:
-                    b_p = d_data["bands"].get(b)
-                    if not b_p:
-                        raise ValueError(f"Historical band file {b} is missing.")
-                    x_arr, ref_meta = self._extract_and_preprocess(b_path=b_p, is_scl=False, clipper=clipper, ref_meta=ref_meta)
-                    if scl_a is not None:
-                        x_arr = self.cloud_masker.apply(x_arr, scl_a)
+                    b_path = workspace_dir / f"hist_{i}_{b}.tif"
+                    if not b_path.exists():
+                        raise ValueError(f"Historical file {b_path.name} is missing in workspace.")
+
+                    x_arr, ref_meta = self._extract_and_preprocess(str(b_path), is_scl=False, clipper=clipper, ref_meta=ref_meta)
+                    if scl_arr is not None:
+                        x_arr = self.cloud_masker.apply(x_arr, scl_arr)
                     historical_features.append(x_arr.flatten())
         except Exception as e:
-            return {"success": False, "error": f"Failed to extract historical features: {str(e)}"}
+            return {"success": False, "error": f"Failed to extract historical features from cache: {str(e)}"}
 
         hist_matrix = np.column_stack(historical_features)
         img_h, img_w = ref_meta["height"], ref_meta["width"]
@@ -247,6 +260,25 @@ class ImageReconstructionOrchestrator:
             except Exception as e:
                 return {"success": False, "error": f"Failed to process target raster: {str(e)}"}
 
+        shapefile_geometry_mask = None
+        if shp_path:
+            try:
+                custom_shp = gpd.read_file(shp_path)
+                temp_raster = rioxarray.open_rasterio(target_path if target_path else str(workspace_dir / f"hist_1_{ALL_BANDS[0]}.tif"))
+                reprojected_shp = custom_shp.to_crs(temp_raster.rio.crs)
+
+                shapefile_geometry_mask = geometry_mask(
+                    geometries=reprojected_shp.geometry,
+                    out_shape=(img_h, img_w),
+                    transform=ref_meta["transform"],
+                    invert=True
+                )
+
+                orig_2d_vis[~shapefile_geometry_mask] = np.nan
+                orig_2d[~shapefile_geometry_mask] = np.nan
+            except Exception as e:
+                logging.warning(f"Failed to apply vector geometry mask: {e}")
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             temp_means = np.nanmean(hist_matrix, axis=1, keepdims=True)
@@ -265,6 +297,9 @@ class ImageReconstructionOrchestrator:
 
         pred_2d = pred_arr.reshape(img_h, img_w)
         patched_2d = np.where(np.isnan(orig_2d), pred_2d, orig_2d)
+
+        if shapefile_geometry_mask is not None:
+            patched_2d[~shapefile_geometry_mask] = np.nan
 
         transform = ref_meta["transform"]
         crs = ref_meta["crs"]
