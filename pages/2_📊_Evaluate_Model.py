@@ -9,7 +9,7 @@ from src.config import KECAMATAN_LIST, ALL_BANDS
 from src.ui.evaluate_model_ui import (
     apply_evaluate_custom_css,
     render_target_parameters_card,
-    render_evaluation_data_source,
+    render_custom_evaluation_uploaders,
     render_evaluation_metrics,
     render_spatial_reconstruction,
     render_evaluation_download
@@ -26,7 +26,11 @@ selected_district, selected_band, selected_model = render_target_parameters_card
 )
 
 if selected_model:
-    data_source, custom_w = render_evaluation_data_source()
+    if selected_district == "Custom Upload":
+        data_source = "custom"
+        render_custom_evaluation_uploaders()
+    else:
+        data_source = "internal"
 
     current_pipeline_identifier = f"{selected_district}_{selected_band}_{selected_model}_{data_source}"
     if st.session_state.get("active_eval_identifier") != current_pipeline_identifier:
@@ -34,7 +38,7 @@ if selected_model:
         st.session_state["active_eval_identifier"] = current_pipeline_identifier
 
     if not st.session_state.get("is_eval_pipeline_completed", False):
-        if st.button("Evaluation Model", type="primary", use_container_width=True):
+        if st.button("Evaluate Model", type="primary", use_container_width=True):
             st.session_state["trigger_eval_execution"] = True
 
     if st.session_state.get("trigger_eval_execution", False):
@@ -71,55 +75,42 @@ if selected_model:
 
         else:
             missing_files = False
-            for i in range(1, custom_w + 1):
-                for b in ALL_BANDS:
-                    if not st.session_state.get(f"up_hist_{i}_{b}"):
-                        missing_files = True
-
             bands_to_check = ALL_BANDS if selected_band == "All Bands" else [selected_band]
+
             for b in bands_to_check:
-                if not st.session_state.get(f"up_gt_{b}"):
+                if not st.session_state.get(f"eval_gt_{b}"):
                     missing_files = True
 
             if missing_files:
-                st.error("Execution Failed: Please ensure all historical files (6 Bands per temporal date) and Ground Truth target files are fully uploaded.")
+                st.error("Execution Failed: Please ensure Ground Truth target files are fully uploaded.")
                 st.session_state["trigger_eval_execution"] = False
             else:
-                with st.spinner("Processing custom spatial data uploads..."):
+                with st.spinner("Processing custom spatial data evaluation..."):
                     session_id = str(uuid.uuid4())
                     temp_mgr = TempWorkspaceManager()
 
                     try:
-                        shp_path = temp_mgr.save_uploaded_file(st.session_state.up_shp, session_id) if hasattr(st.session_state, "up_shp") and st.session_state.up_shp else None
-                        gt_scl_file = st.session_state.get("up_gt_scl")
+                        shp_file = st.session_state.get("eval_shp")
+                        shp_path = temp_mgr.save_uploaded_file(shp_file, session_id) if shp_file else None
+
+                        gt_scl_file = st.session_state.get("eval_gt_scl")
                         gt_scl_path = temp_mgr.save_uploaded_file(gt_scl_file, session_id) if gt_scl_file else None
 
-                        hist_payload = []
-                        for i in range(1, custom_w + 1):
-                            hist_scl_file = st.session_state.get(f"up_hist_scl_{i}")
-                            h_scl_path = temp_mgr.save_uploaded_file(hist_scl_file, session_id) if hist_scl_file else None
-                            band_paths = {}
-                            for b in ALL_BANDS:
-                                band_paths[b] = temp_mgr.save_uploaded_file(st.session_state[f"up_hist_{i}_{b}"], session_id)
-                            hist_payload.append({"scl": h_scl_path, "bands": band_paths})
-
                         if selected_band == "All Bands":
-                            gt_paths = {b: temp_mgr.save_uploaded_file(st.session_state[f"up_gt_{b}"], session_id) for b in ALL_BANDS}
+                            gt_paths = {b: temp_mgr.save_uploaded_file(st.session_state[f"eval_gt_{b}"], session_id) for b in ALL_BANDS}
                             res = orchestrator.execute_custom_all_bands_evaluation(
                                 district=selected_district,
                                 model_base_name=selected_model,
-                                hist_payload=hist_payload,
                                 gt_paths=gt_paths,
                                 gt_scl_path=gt_scl_path,
                                 shp_path=shp_path,
                             )
                         else:
-                            gt_path = temp_mgr.save_uploaded_file(st.session_state[f"up_gt_{selected_band}"], session_id)
+                            gt_path = temp_mgr.save_uploaded_file(st.session_state[f"eval_gt_{selected_band}"], session_id)
                             res = orchestrator.execute_custom_single_band_evaluation(
                                 district=selected_district,
                                 band=selected_band,
                                 model_base_name=selected_model,
-                                hist_payload=hist_payload,
                                 gt_path=gt_path,
                                 gt_scl_path=gt_scl_path,
                                 shp_path=shp_path,

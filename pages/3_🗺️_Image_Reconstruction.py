@@ -26,20 +26,17 @@ apply_reconstruction_custom_css()
 
 st.markdown("### 🖼️ Spatial Image Reconstruction")
 
+
 selected_district, selected_band, selected_model = (
     render_reconstruction_parameters_card(KECAMATAN_LIST, ALL_BANDS)
 )
 
 if selected_model:
     with st.container(border=True):
-        st.markdown("##### Reconstruction Data Source")
-        recon_mode = st.radio(
-            "Select the spatial data extraction paradigm:",
-            ["Data Segmen 1 Segmen 2 DAS Ciliwung", "Upload Data"],
-            key="recon_data_source",
-        )
+        if selected_district != "Custom Upload":
+            recon_mode = "internal"
+            st.markdown("##### Internal Database Configuration")
 
-        if recon_mode == "Data Segmen 1 Segmen 2 DAS Ciliwung":
             temporal_data_discoverer = TemporalDataDiscoverer()
             available_dates_catalog = temporal_data_discoverer.process(
                 config.MICRO_ROOT, selected_district
@@ -99,14 +96,18 @@ if selected_model:
                 target_date_str = custom_date.strftime("%Y%m%d")
 
             window_size = 5
+
         else:
-            window_size = 5
+            recon_mode = "custom"
             render_custom_reconstruction_uploaders(prefix="recon")
+            window_size = 5
+            target_date_str = "Custom Upload"
+
 
     if st.button("Image Reconstruction", type="primary", use_container_width=True):
         orchestrator = ImageReconstructionOrchestrator()
 
-        if recon_mode == "Data Segmen 1 Segmen 2 DAS Ciliwung":
+        if recon_mode == "internal":
             bands_to_run = (
                 ALL_BANDS if selected_band == "All Bands" else [selected_band]
             )
@@ -179,17 +180,18 @@ if selected_model:
                     )
                 else:
                     st.error(error_msg)
+
         else:
             missing_files = False
-            for b in ALL_BANDS:
+            bands_to_check = ALL_BANDS if selected_band == "All Bands" else [selected_band]
+
+            for b in bands_to_check:
                 if not st.session_state.get(f"recon_target_{b}"):
                     missing_files = True
-            if not st.session_state.get("recon_shp"):
-                missing_files = True
 
             if missing_files:
                 st.error(
-                    "Execution Failed: Please upload the required shapefile bundle and all target imagery files (6 Bands)."
+                    "Execution Failed: Please upload all target imagery files for the selected bands."
                 )
             else:
                 with st.spinner("Processing custom spatial upload reconstruction..."):
@@ -197,22 +199,26 @@ if selected_model:
                     temp_mgr = TempWorkspaceManager()
                     try:
                         shp_path = temp_mgr.save_uploaded_file(
-                            st.session_state.recon_shp, session_id
-                        )
-                        target_scl_path = (
-                            temp_mgr.save_uploaded_file(
-                                st.session_state.get("recon_target_scl"), session_id
-                            )
-                            if st.session_state.get("recon_target_scl")
-                            else None
-                        )
+                            st.session_state.get("recon_shp"), session_id
+                        ) if st.session_state.get("recon_shp") else None
 
-                        target_paths = {
-                            b: temp_mgr.save_uploaded_file(
-                                st.session_state[f"recon_target_{b}"], session_id
-                            )
-                            for b in ALL_BANDS
-                        }
+                        target_scl_path = temp_mgr.save_uploaded_file(
+                            st.session_state.get("recon_target_scl"), session_id
+                        ) if st.session_state.get("recon_target_scl") else None
+
+                        if selected_band == "All Bands":
+                            target_paths = {
+                                b: temp_mgr.save_uploaded_file(
+                                    st.session_state[f"recon_target_{b}"], session_id
+                                )
+                                for b in ALL_BANDS
+                            }
+                        else:
+                            target_paths = {
+                                selected_band: temp_mgr.save_uploaded_file(
+                                    st.session_state[f"recon_target_{selected_band}"], session_id
+                                )
+                            }
 
                         bands_to_run = (
                             ALL_BANDS
@@ -271,7 +277,7 @@ if selected_model:
                                         "rgba_reconstructed": rgb_recon,
                                         "is_synthetic": band_visuals["B02"].get("is_synthetic", False)
                                     }
-                                    
+
                                     render_reconstruction_results(
                                         rgb_visuals,
                                         title_metadata="Custom Upload - True Color RGB",
@@ -284,7 +290,7 @@ if selected_model:
                                 )
 
                             render_download_assets(
-                                tif_bytes_dict, selected_district, "CustomOutput"
+                                tif_bytes_dict, "CustomUpload", "Reconstructed"
                             )
                         else:
                             st.error(error_msg)
