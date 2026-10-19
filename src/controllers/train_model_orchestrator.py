@@ -121,7 +121,7 @@ class TrainModelOrchestrator:
         return X_full, y_full, oot_gt_date
 
     def extract_custom_data(self, band: str, historical_files: list, ground_truth_file: str, gt_scl_file: str = None, shapefile_path: str = None):
-        logging.info(f"📥 Extracting CUSTOM UPLOAD DATA for {band}...")
+        logging.info(f"📥 Extracting CUSTOM UPLOAD DATA for band {band} (Multispectral W * 6 bands)...")
         clipper = VectorClipper(shapefile_path) if shapefile_path else None
 
         y_arr_2d, y_meta = self._extract_and_preprocess(ground_truth_file, is_scl=False, clipper=clipper)
@@ -132,18 +132,31 @@ class TrainModelOrchestrator:
 
         X_list = []
         for hist_data in historical_files:
-            x_arr_2d, _ = self._extract_and_preprocess(hist_data["target"], is_scl=False, clipper=clipper, ref_meta=y_meta)
-            if hist_data.get("scl"):
-                x_scl_arr, _ = self._extract_and_preprocess(hist_data["scl"], is_scl=True, clipper=clipper, ref_meta=y_meta)
-                x_arr_2d = self.cloud_masker.apply(x_arr_2d, x_scl_arr)
-            X_list.append(x_arr_2d.flatten())
+            scl_p = hist_data.get("scl")
+            scl_arr = None
+            if scl_p:
+                scl_arr, _ = self._extract_and_preprocess(scl_p, is_scl=True, clipper=clipper, ref_meta=y_meta)
+
+            for b in ALL_BANDS:
+                b_p = hist_data.get("bands", {}).get(b)
+
+                if not b_p:
+                    raise ValueError(f"Historical file for band {b} is missing in custom upload payload.")
+
+                x_arr_2d, _ = self._extract_and_preprocess(b_p, is_scl=False, clipper=clipper, ref_meta=y_meta)
+                if scl_arr is not None:
+                    x_arr_2d = self.cloud_masker.apply(x_arr_2d, scl_arr)
+
+                X_list.append(x_arr_2d.flatten())
 
         X_full = np.column_stack(X_list)
         valid_mask = ~np.isnan(X_full).any(axis=1) & ~np.isnan(y_arr)
         X_clean, y_clean = X_full[valid_mask], y_arr[valid_mask]
 
         if len(y_clean) == 0:
-            raise ValueError("No valid pixels left after clipping, masking, and NaN removal.")
+            raise ValueError("No valid pixels left after clipping, masking, and NaN removal in custom upload.")
+
+        logging.info(f"✨ Custom multispectral matrix extracted successfully. Shape: {X_clean.shape}")
         return X_clean, y_clean, Path(ground_truth_file).stem
 
     def run_training_on_extracted_data(self, X_data, y_data, test_size: float = 0.2, random_state: int = 42, alphas: list = None, l1_ratios: list = None):
@@ -262,29 +275,50 @@ class TrainModelOrchestrator:
 
     def execute_custom_pipeline(self, base_name: str, config_dict: dict, session_state_ref, status_container, progress_bar) -> pd.DataFrame:
         w = config_dict['w']
-        session_id = str(uuid.uuid4())
-        temp_mgr = TempWorkspaceManager()
+
+        safe_base_name = "".join(c if c.isalnum() else "_" for c in base_name)
+        session_id = safe_base_name
+
+        temp_mgr = TempWorkspaceManager(base_temp_dir="data/custom_workspace")
         results = []
         all_bands_history = {}
 
         try:
             shp_file = session_state_ref.get("up_shp")
-            shp_path = temp_mgr.save_uploaded_file(shp_file, session_id) if shp_file else None
+            shp_path = temp_mgr.save_uploaded_file(shp_file, session_id, custom_name="shapefile.shp") if shp_file else None
+
+            shx_file = session_state_ref.get("up_shx")
+            if shx_file:
+                temp_mgr.save_uploaded_file(shx_file, session_id, custom_name="shapefile.shx")
+
+            dbf_file = session_state_ref.get("up_dbf")
+            if dbf_file:
+                temp_mgr.save_uploaded_file(dbf_file, session_id, custom_name="shapefile.dbf")
+
+            prj_file = session_state_ref.get("up_prj")
+            if prj_file:
+                temp_mgr.save_uploaded_file(prj_file, session_id, custom_name="shapefile.prj")
 
             for idx, band in enumerate(ALL_BANDS):
-                status_container.write(f"📥 Extracting User Data for {band} (Only once)...")
+                status_container.write(f"📥 Extracting User Data for {band}...")
                 current_model_name = f"{base_name}_{band}"
 
-                gt_path = temp_mgr.save_uploaded_file(session_state_ref[f"up_gt_{band}"], session_id)
+                gt_path = temp_mgr.save_uploaded_file(session_state_ref[f"up_gt_{band}"], session_id, custom_name=f"gt_{band}.tif")
                 gt_scl_file = session_state_ref.get("up_gt_scl")
-                gt_scl_path = temp_mgr.save_uploaded_file(gt_scl_file, session_id) if gt_scl_file else None
+                gt_scl_path = temp_mgr.save_uploaded_file(gt_scl_file, session_id, custom_name="gt_scl.tif") if gt_scl_file else None
 
                 hist_paths = []
                 for i in range(1, w + 1):
-                    h_path = temp_mgr.save_uploaded_file(session_state_ref[f"up_hist_{i}_{band}"], session_id)
+                    bands_dict = {}
+                    for b in ALL_BANDS:
+                        h_file = session_state_ref.get(f"up_hist_{i}_{b}")
+                        if h_file:
+                            bands_dict[b] = temp_mgr.save_uploaded_file(h_file, session_id, custom_name=f"hist_{i}_{b}.tif")
+
                     hist_scl_file = session_state_ref.get(f"up_hist_scl_{i}")
-                    h_scl_path = temp_mgr.save_uploaded_file(hist_scl_file, session_id) if hist_scl_file else None
-                    hist_paths.append({"target": h_path, "scl": h_scl_path})
+                    h_scl_path = temp_mgr.save_uploaded_file(hist_scl_file, session_id, custom_name=f"hist_scl_{i}.tif") if hist_scl_file else None
+
+                    hist_paths.append({"bands": bands_dict, "scl": h_scl_path})
 
                 X_master, y_master, oot_gt_date = self.extract_custom_data(
                     band=band, historical_files=hist_paths, ground_truth_file=gt_path,
@@ -336,16 +370,16 @@ class TrainModelOrchestrator:
                                 "Seed": config_dict['seed']
                             }
 
-                            metadata_payload = {
-                                "Samples": actual_samples, "Train_Ratio": ratio_label,
-                                "Alpha": best_params.get("alpha"), "L1_Ratio": best_params.get("l1_ratio"),
-                                "Seed": config_dict['seed'], "Val_R2": round(best_overall_r2, 4),
-                                "OOT_Target": oot_gt_date
-                            }
+                metadata_payload = {
+                    "Samples": actual_samples, "Train_Ratio": ratio_label,
+                    "Alpha": best_params.get("alpha"), "L1_Ratio": best_params.get("l1_ratio"),
+                    "Seed": config_dict['seed'], "Val_R2": round(best_overall_r2, 4),
+                    "OOT_Target": oot_gt_date, "Window_Size": w
+                }
 
-                            save_path = ModelRegistry.generate_model_path("CustomUpload", band, current_model_name)
-                            self.finalize_and_save_model(save_path, metadata_payload)
-                            logging.info(f"🌟 New best model saved for {band} (R2: {best_overall_r2:.4f})")
+                save_path = ModelRegistry.generate_model_path("Custom Upload", band, current_model_name)
+                self.finalize_and_save_model(save_path, metadata_payload)
+                logging.info(f"🌟 New best model saved for {band} (R2: {best_overall_r2:.4f})")
 
                 all_bands_history[band] = band_grid_history
                 results.append({
@@ -360,10 +394,11 @@ class TrainModelOrchestrator:
                 progress_bar.progress(int(((idx + 1) / 6) * 100))
                 status_container.write(f"✅ Success training for {band} (Best R2: {best_overall_r2:.4f})")
 
-            self._save_multisheet_experiment_log(base_name, all_bands_history, "CustomUpload")
-            temp_mgr.cleanup_session(session_id)
-            status_container.write("🧹 Workspace cleanup successful.")
+            self._save_multisheet_experiment_log(base_name, all_bands_history, "Custom Upload")
+
+            status_container.write("📁 Dataset saved permanently to Custom Workspace.")
             return pd.DataFrame(results)
+
         except Exception as e:
             if 'session_id' in locals(): temp_mgr.cleanup_session(session_id)
             raise RuntimeError(f"Custom Training Failed: {e}")
