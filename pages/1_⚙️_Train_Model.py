@@ -34,7 +34,7 @@ if "is_training" not in st.session_state:
 is_disabled = st.session_state.is_training
 
 tab1, tab2 = st.tabs(
-    ["Ciliwung (Segmen & Segmen 2)", "Upload Data"]
+    ["Ciliwung (Segmen 1 & Segmen 2)", "Upload Data"]
 )
 
 with tab1:
